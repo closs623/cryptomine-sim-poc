@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoMine Sim - Plataforma de Inversión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-dark': '#1f2937', // gray-800
+                        'accent-crypto': '#34d399', // emerald-400
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos base para el scrollbar */
+        body::-webkit-scrollbar { width: 8px; }
+        body::-webkit-scrollbar-track { background: #111827; }
+        body::-webkit-scrollbar-thumb { background: #34d399; border-radius: 4px; }
+        body::-webkit-scrollbar-thumb:hover { background: #10b981; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans">
+
+    <nav class="bg-primary-dark shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-2xl font-bold text-accent-crypto">CryptoMine Sim</span>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <select id="lang-selector" class="bg-gray-700 text-gray-100 rounded-md py-1 px-2 focus:ring-accent-crypto focus:border-accent-crypto">
+                        <option value="es">Español 🇪🇸</option>
+                        <option value="en">English 🇬🇧</option>
+                        </select>
+                    <button id="logout-btn" class="text-sm font-medium text-red-400 hover:text-red-500 transition duration-150 ease-in-out">
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main id="app-container" class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+        <h1 class="text-center text-3xl font-extrabold text-accent-crypto animate-pulse">Cargando Simulación...</h1>
+        </main>
+
+    <footer class="bg-primary-dark mt-12 border-t border-gray-700">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-400">
+            &copy; 2025 CryptoMine Sim PoC. Todos los derechos simulados.
+            <div class="mt-2 space-x-4">
+                <a href="#" class="hover:text-accent-crypto transition duration-150">Términos de Servicio</a>
+                <span class="text-gray-600">|</span>
+                <a href="#" class="hover:text-accent-crypto transition duration-150">Política de Privacidad</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // === DATOS SIMULADOS ===
+        const ADMIN_EMAIL = 'admin@mineria.com';
+        const SIM_CONFIG = {
+            plans: [
+                { id: 1, name: "Miner Sim I", cost: 8, duration: 15, dailyReturn: 1 },
+                { id: 2, name: "Miner Sim II", cost: 50, duration: 30, dailyReturn: 6 },
+                { id: 3, name: "Miner Sim III", cost: 100, duration: 30, dailyReturn: 13 }
+            ],
+            cryptoPrices: { BTC: 65000, ETH: 3500, BNB: 600 }
+        };
+
+        let userState = {
+            isLoggedIn: false,
+            role: 'client', // 'client' o 'admin'
+            email: null,
+            balance: 15.00, // Saldo inicial para la simulación
+            activeContracts: [],
+            transactionHistory: [] // NUEVO: Historial de transacciones
+        };
+
+        // === FUNCIONES DE RENDERIZADO ===
+
+        const appContainer = document.getElementById('app-container');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        function showNotification(message, type = 'success') {
+            const color = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+            alert(`[Notificación ${type.toUpperCase()}] ${message}`); // Usar alert simple por simplicidad
+        }
+
+        function renderAuth() {
+            logoutBtn.style.display = 'none';
+            appContainer.innerHTML = `
+                <div class="max-w-md mx-auto bg-primary-dark p-8 rounded-xl shadow-2xl border border-gray-700">
+                    <h2 class="text-3xl font-extrabold text-center text-accent-crypto mb-6">Iniciar Sesión (Modo Simulado)</h2>
+                    
+                    <form id="login-form" class="space-y-4">
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-300">Correo Electrónico</label>
+                            <input type="email" id="login-email" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-accent-crypto focus:border-accent-crypto">
+                        </div>
+                        <div>
+                            <label for="password" class="block text-sm font-medium text-gray-300">Contraseña</label>
+                            <input type="password" id="login-password" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-accent-crypto focus:border-accent-crypto">
+                        </div>
+                        <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-gray-900 bg-accent-crypto hover:bg-emerald-500 focus:outline-none transition duration-150">
+                            INICIAR SESIÓN
+                        </button>
+                    </form>
+                    <p class="mt-4 text-center text-sm text-gray-400">¿No tienes cuenta? 
+                        <a href="#" id="switch-to-register" class="font-medium text-accent-crypto hover:text-emerald-500">Regístrate aquí</a>
+                    </p>
+                </div>
+            `;
+            // Listener para el formulario de Login
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+        }
+
+        function renderClientDashboard() {
+            logoutBtn.style.display = 'block';
+            
+            // Renderizado de Contratos Activos
+            const contractsHTML = userState.activeContracts.length > 0 ?
+                userState.activeContracts.map(c => `
+                    <li class="p-3 bg-gray-800 rounded-lg shadow-inner flex justify-between items-center mb-2">
+                        <span>${c.name} (${c.duration} días)</span>
+                        <span class="text-yellow-400 font-bold">$${c.dailyReturn.toFixed(2)} / día</span>
+                    </li>
+                `).join('') :
+                '<p class="text-center py-4 text-gray-400">No hay contratos activos. ¡Invierte ahora!</p>';
+
+            // Renderizado de Historial de Transacciones (NUEVO)
+            const historyHTML = userState.transactionHistory.length > 0 ?
+                userState.transactionHistory.map(t => `
+                    <li class="p-3 border-b border-gray-700 flex justify-between items-center text-sm">
+                        <span class="${t.type === 'deposit' || t.type === 'bonus' ? 'text-green-400' : 'text-red-400'}">${t.description}</span>
+                        <span class="font-mono">${new Date(t.date).toLocaleDateString()}</span>
+                    </li>
+                `).join('') :
+                '<p class="text-center py-4 text-gray-400">No hay transacciones recientes.</p>';
+
+            appContainer.innerHTML = `
+                <h1 class="text-4xl font-bold mb-8 text-white">Panel de Cliente 👋</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    
+                    <div class="lg:col-span-1 bg-primary-dark p-6 rounded-xl shadow-2xl border border-gray-700">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-crypto">Mi Saldo</h2>
+                        <p class="text-5xl font-extrabold mb-4 text-white">$${userState.balance.toFixed(2)} USD</p>
+                        
+                        <button id="daily-bonus-btn" class="w-full mt-4 py-2 px-4 rounded-md text-sm font-bold text-gray-900 bg-yellow-400 hover:bg-yellow-500 transition duration-150 shadow-lg hover:shadow-xl">
+                            CLAIM BONO DIARIO +$1.00
+                        </button>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-primary-dark p-6 rounded-xl shadow-2xl border border-gray-700">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-crypto">Precios en Tiempo Real (Simulado)</h2>
+                        <div class="grid grid-cols-3 gap-4">
+                            ${Object.keys(SIM_CONFIG.cryptoPrices).map(key => `
+                                <div class="bg-gray-800 p-4 rounded-lg text-center border border-gray-700">
+                                    <p class="text-lg font-bold">${key}</p>
+                                    <p class="text-xl text-green-400">$${SIM_CONFIG.cryptoPrices[key].toLocaleString()}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <div class="border-b border-gray-700">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button id="tab-inversion" class="tab-button border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-200 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition duration-150" data-target="investment">Inversión</button>
+                            <button id="tab-deposit" class="tab-button border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-200 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition duration-150" data-target="deposit">Depósito</button>
+                            <button id="tab-withdraw" class="tab-button border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-200 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition duration-150" data-target="withdraw">Retiro</button>
+                            <button id="tab-history" class="tab-button border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-200 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition duration-150" data-target="history">Historial (NUEVO)</button>
+                        </nav>
+                    </div>
+
+                    <div id="tab-content" class="mt-6 bg-primary-dark p-6 rounded-xl shadow-2xl border border-gray-700">
+                        </div>
+                </div>
+            `;
+            
+            // Inicializar la vista de Inversión y listeners
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => switchTab(e.target.dataset.target));
+            });
+            switchTab('investment'); // Pestaña por defecto
+            document.getElementById('daily-bonus-btn').addEventListener('click', handleDailyBonus);
+        }
+
+        function renderAdminDashboard() {
+             logoutBtn.style.display = 'block';
+             appContainer.innerHTML = `
+                <h1 class="text-4xl font-bold mb-8 text-white">Panel de Administrador 👑</h1>
+                <p class="text-red-400 mb-6">ESTÁS EN MODO ADMIN. Todas las acciones son simuladas.</p>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-primary-dark p-6 rounded-xl shadow-2xl border border-gray-700">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-crypto">Métricas Sim.</h2>
+                        <p class="text-2xl font-bold">Total Usuarios: <span class="text-green-400">50 (Sim)</span></p>
+                        <p class="text-md text-gray-400 mt-2">Depósitos Pendientes: <span class="text-yellow-400">3</span></p>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-primary-dark p-6 rounded-xl shadow-2xl border border-gray-700">
+                        <h2 class="text-xl font-semibold mb-4 text-accent-crypto">Bandeja de Soporte y Depósitos (Sim)</h2>
+                        <ul class="space-y-3 h-64 overflow-y-auto bg-gray-800 p-4 rounded-lg">
+                            <li class="bg-gray-700 p-3 rounded-md text-sm">
+                                <span class="font-bold text-yellow-400">[DEPÓSITO PENDIENTE]</span> User X solicita $50 USD. ID de Solicitud: #9084.
+                                <button class="ml-4 text-green-400 hover:text-green-500 font-bold">Confirmar y Sumar Saldo</button>
+                            </li>
+                            <li class="bg-gray-700 p-3 rounded-md text-sm">
+                                <span class="font-bold text-blue-400">[SOPORTE CHAT]</span> Usuario Y: "No veo mis ganancias diarias."
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+             `;
+        }
+
+        // === FUNCIONES DE LÓGICA ===
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            // Simulación de credenciales
+            if (email === ADMIN_EMAIL) {
+                userState.isLoggedIn = true;
+                userState.role = 'admin';
+                userState.email = email;
+                renderAdminDashboard();
+                showNotification('Acceso como Administrador simulado.', 'success');
+            } else if (email.includes('@')) { // Cualquier otro email válido se considera cliente
+                userState.isLoggedIn = true;
+                userState.role = 'client';
+                userState.email = email;
+                // Simular historial de ejemplo
+                userState.transactionHistory.push({ type: 'deposit', description: 'Depósito Inicial Simulado +$15.00', date: Date.now() });
+                renderClientDashboard();
+                showNotification('Inicio de Sesión como Cliente simulado.', 'success');
+            } else {
+                showNotification('Credenciales incorrectas o usuario no registrado.', 'error');
+            }
+        }
+        
+        function handleDailyBonus() {
+            // Lógica simple para evitar doble reclamo en la misma sesión de prueba
+            if (userState.transactionHistory.some(t => t.type === 'bonus' && new Date(t.date).toDateString() === new Date().toDateString())) {
+                showNotification('Ya reclamaste tu bono diario por hoy. ¡Vuelve mañana!', 'error');
+                return;
+            }
+
+            const bonusAmount = 1.00;
+            userState.balance += bonusAmount;
+            userState.transactionHistory.push({
+                type: 'bonus',
+                description: `Bono Diario Reclamado +$${bonusAmount.toFixed(2)}`,
+                date: Date.now()
+            });
+            showNotification(`¡Bono diario reclamado! Se han añadido $${bonusAmount.toFixed(2)} a tu saldo.`, 'success');
+            renderClientDashboard(); // Vuelve a renderizar para actualizar el saldo
+        }
+
+        function handleInvestment(planId) {
+            const plan = SIM_CONFIG.plans.find(p => p.id === planId);
+            if (!plan) return showNotification('Plan no encontrado.', 'error');
+
+            if (userState.balance >= plan.cost) {
+                userState.balance -= plan.cost;
+                userState.activeContracts.push({
+                    name: plan.name,
+                    dailyReturn: plan.dailyReturn,
+                    duration: plan.duration,
+                    startDate: Date.now()
+                });
+                userState.transactionHistory.push({
+                    type: 'investment',
+                    description: `Inversión en ${plan.name} -$${plan.cost.toFixed(2)}`,
+                    date: Date.now()
+                });
+                showNotification(`¡Inversión exitosa! Contrato ${plan.name} activado.`, 'success');
+                renderClientDashboard();
+            } else {
+                showNotification(`Saldo insuficiente. Necesitas $${(plan.cost - userState.balance).toFixed(2)} más.`, 'error');
+            }
+        }
+        
+        function switchTab(tab) {
+            // Actualizar botones de pestaña
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('border-accent-crypto', 'text-white');
+                btn.classList.add('border-transparent', 'text-gray-400');
+            });
+            const activeTabButton = document.querySelector(`[data-target="${tab}"]`);
+            if (activeTabButton) {
+                activeTabButton.classList.add('border-accent-crypto', 'text-white');
+                activeTabButton.classList.remove('border-transparent', 'text-gray-400');
+            }
+
+            const tabContent = document.getElementById('tab-content');
+            
+            // Renderizar contenido de la pestaña
+            if (tab === 'investment') {
+                tabContent.innerHTML = `
+                    <h3 class="text-2xl font-semibold mb-4 text-white">Planes de Minería</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        ${SIM_CONFIG.plans.map(p => `
+                            <div class="p-6 bg-gray-800 rounded-lg shadow-xl border-t-4 border-accent-crypto flex flex-col justify-between h-full">
+                                <div>
+                                    <h4 class="text-xl font-bold mb-2 text-accent-crypto">${p.name}</h4>
+                                    <p class="text-4xl font-extrabold mb-4 text-white">$${p.cost} USD</p>
+                                    <p class="text-gray-400 mb-2">Ganancia Diaria Sim: <span class="font-bold text-yellow-400">$${p.dailyReturn.toFixed(2)}</span></p>
+                                    <p class="text-gray-400">Duración: ${p.duration} días</p>
+                                </div>
+                                <button onclick="handleInvestment(${p.id})" class="mt-4 w-full py-2 bg-emerald-600 text-white font-bold rounded-md hover:bg-emerald-700 transition duration-150">
+                                    INVERTIR
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <h3 class="text-xl font-semibold mt-8 mb-4 text-white">Contratos Activos</h3>
+                    <ul class="space-y-2">
+                        ${userState.activeContracts.length > 0 ?
+                            userState.activeContracts.map(c => `<li class="p-3 bg-gray-800 rounded-lg shadow-inner flex justify-between items-center"><span>${c.name}</span><span class="text-yellow-400 font-bold">$${c.dailyReturn.toFixed(2)}/día</span></li>`).join('') :
+                            '<p class="text-gray-400">No hay contratos activos.</p>'
+                        }
+                    </ul>
+                `;
+            } else if (tab === 'deposit') {
+                tabContent.innerHTML = `
+                    <h3 class="text-2xl font-semibold mb-4 text-white">Simulación de Depósito</h3>
+                    <div class="bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <p class="mb-4 text-gray-300">Envía el monto simulado a la siguiente billetera y confirma:</p>
+                        <div class="p-4 bg-gray-700 rounded-md mb-4 font-mono text-sm break-all">
+                            <span class="text-accent-crypto">Billetera USDT/BNB (BEP20):</span> 0x9Ce... [dirección simulada]
+                        </div>
+                        <form id="deposit-form" class="space-y-4">
+                            <div>
+                                <label for="deposit-amount" class="block text-sm font-medium text-gray-300">Monto a Depositar (Sim)</label>
+                                <input type="number" id="deposit-amount" min="1" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-accent-crypto focus:border-accent-crypto">
+                            </div>
+                            <button type="submit" class="w-full py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition duration-150">
+                                CONFIRMAR DEPÓSITO (Enviar Notificación a Admin)
+                            </button>
+                        </form>
+                    </div>
+                `;
+                document.getElementById('deposit-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const amount = parseFloat(document.getElementById('deposit-amount').value);
+                    if (amount > 0) {
+                        showNotification(`Depósito simulado de $${amount.toFixed(2)} enviado al Administrador para aprobación.`, 'success');
+                        // En un entorno real, esto enviaría el registro a Firestore/Admin Chat
+                    }
+                });
+            } else if (tab === 'withdraw') {
+                tabContent.innerHTML = `
+                    <h3 class="text-2xl font-semibold mb-4 text-white">Simulación de Retiro</h3>
+                    <form id="withdraw-form" class="space-y-4 bg-gray-800 p-6 rounded-lg border border-gray-700">
+                        <div>
+                            <label for="withdraw-amount" class="block text-sm font-medium text-gray-300">Monto a Retirar (Max: $${userState.balance.toFixed(2)})</label>
+                            <input type="number" id="withdraw-amount" min="1" max="${userState.balance.toFixed(2)}" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-accent-crypto focus:border-accent-crypto">
+                        </div>
+                        <div>
+                            <label for="withdraw-wallet" class="block text-sm font-medium text-gray-300">Billetera de Retiro (USDT / BEP20)</label>
+                            <input type="text" id="withdraw-wallet" required class="mt-1 block w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-accent-crypto focus:border-accent-crypto">
+                        </div>
+                        <button type="submit" class="w-full py-2 bg-red-600 text-white font-bold rounded-md hover:bg-red-700 transition duration-150">
+                            SOLICITAR RETIRO
+                        </button>
+                    </form>
+                `;
+                document.getElementById('withdraw-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const amount = parseFloat(document.getElementById('withdraw-amount').value);
+                    if (amount > 0 && amount <= userState.balance) {
+                        showNotification(`Solicitud de retiro de $${amount.toFixed(2)} enviada al Administrador para aprobación.`, 'success');
+                        // En un entorno real, esto crearía una solicitud pendiente para el Admin
+                    } else {
+                         showNotification(`Monto no válido. Tu saldo actual es $${userState.balance.toFixed(2)}.`, 'error');
+                    }
+                });
+            } else if (tab === 'history') { // NUEVO: Historial de Transacciones
+                 const historyHTML = userState.transactionHistory.length > 0 ?
+                    userState.transactionHistory.map(t => `
+                        <li class="p-3 border-b border-gray-700 flex justify-between items-center text-sm hover:bg-gray-700 transition duration-150">
+                            <span class="${t.type === 'deposit' || t.type === 'bonus' ? 'text-green-400' : 'text-red-400'} font-medium">${t.description}</span>
+                            <span class="text-gray-400 font-mono">${new Date(t.date).toLocaleString()}</span>
+                        </li>
+                    `).join('') :
+                    '<p class="text-center py-4 text-gray-400">No hay transacciones recientes.</p>';
+
+                tabContent.innerHTML = `
+                    <h3 class="text-2xl font-semibold mb-4 text-white">Historial de Transacciones (Sim)</h3>
+                    <ul class="space-y-1">
+                        ${historyHTML}
+                    </ul>
+                `;
+            }
+        }
+        
+        // === INICIALIZACIÓN ===
+
+        function initApp() {
+            // Simular un retardo de carga
+            setTimeout(() => {
+                // Verificar si hay un estado de sesión simulado guardado (opcional, para una simulación más persistente)
+                // Por ahora, siempre inicia en la pantalla de autenticación para la PoC.
+                if (userState.isLoggedIn) {
+                    userState.role === 'admin' ? renderAdminDashboard() : renderClientDashboard();
+                } else {
+                    renderAuth();
+                }
+            }, 1000); // 1 segundo de "carga"
+            
+            // Listener de Cerrar Sesión
+            logoutBtn.addEventListener('click', () => {
+                userState.isLoggedIn = false;
+                userState.role = 'client';
+                userState.email = null;
+                userState.balance = 15.00; // Resetear el saldo para nueva simulación
+                userState.activeContracts = [];
+                userState.transactionHistory = [];
+                showNotification('Cerraste sesión con éxito.', 'info');
+                renderAuth();
+            });
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
